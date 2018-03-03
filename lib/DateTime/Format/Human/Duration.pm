@@ -16,13 +16,13 @@ sub format_duration_between {
     my ($span, $dt, $dtb, %args) = @_;
     my $dur = $dt - $dtb;
 
-    if (!exists $args{'locale'}) {
+    unless (exists $args{'locale'}) {
         my $locale_obj = $dt->locale;
-        if (UNIVERSAL::can($locale_obj, 'code')) {
-            $args{'locale'} = $locale_obj->code; # DateTime::Locale v1
-        } else {
-            $args{'locale'} = $locale_obj->id;   # DateTime::Locale v0
-        }
+
+        # 'code' is from DateTime::Locale v1, 'id' from v0
+        my( $method ) = grep { UNIVERSAL::can($locale_obj,$_) } qw/ code id /;
+
+        $args{locale} = $locale_obj->$method;
     }
     
     return $span->format_duration($dur, %args);    
