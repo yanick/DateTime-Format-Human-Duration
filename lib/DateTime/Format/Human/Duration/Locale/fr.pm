@@ -21,7 +21,7 @@ sub get_human_span_hashref {
         'minute'  => 'minute',
         'minutes' => 'minutes',
         'second'  => 'seconde',
-        'seconds' => 'seconds',
+        'seconds' => 'secondes',
         'nanosecond'  => 'nanoseconde',
         'nanoseconds' => 'nanosecondes',      
     };
