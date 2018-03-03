@@ -14,7 +14,6 @@ sub new {
 
 sub format_duration_between {
     my ($span, $dt, $dtb, %args) = @_;
-    my $dur = $dt - $dtb;
 
     unless (exists $args{'locale'}) {
         my $locale_obj = $dt->locale;
@@ -25,7 +24,7 @@ sub format_duration_between {
         $args{locale} = $locale_obj->$method;
     }
     
-    return $span->format_duration($dur, %args);    
+    return $span->format_duration($dt - $dtb, %args);    
 }
 
 sub format_duration {
@@ -36,11 +35,10 @@ sub format_duration {
     my @units = $args{'units'} ? @{ $args{'units'} } : @default_units;
     if ($args{'precision'}) {
         # Reduce time resolution to requested precision
-        for (my $i = 0; $i < scalar(@units); $i++) {
-            next unless ($units[$i] eq $args{'precision'});
+        for my $i ( grep { $units[$_] eq $args{'precision'} } 0..$#units ) {
             splice(@units, $i + 1);
         }
-        croak('Useless precision') unless (@units);
+        croak 'Useless precision' unless @units;
     }
 
     my @duration_vals = $duration->in_units( @units ); 
@@ -48,21 +46,10 @@ sub format_duration {
     my %duration_vals = map { ($_ => $duration_vals[$i++]) } @units;
     my %positive_duration_vals = map { ($_ => abs $duration_vals{$_}) } keys %duration_vals;
 
-    my $say = '';
-    
     # $dta - $dtb:
     #   if dta < dtb means past -> future (Duration units will have negatives)
     #   else its either this absolute instant (no_time) or the past
-    if ( grep { $_ < 0 } @duration_vals ) {
-        if ( exists $args{'future'} ) {
-            $say = $args{'future'}    
-        }        
-    }
-    else {
-        if ( exists $args{'past'} ) {
-            $say = $args{'past'}    
-        }
-    }
+    my $say = $args{ ( grep { $_ < 0 } @duration_vals ) ? 'future' : 'past' };
     
     ####
     ## this is essentially the hashref that is returned from DateTime::Format::Human::Duration::en::get_human_span_hashref() : #
@@ -70,23 +57,12 @@ sub format_duration {
     my $setup = {
         'no_oxford_comma' => 0,
         'no_time' => 'no time', # The wait will be $formatted_duration   
-        'and'     => 'and',    
-        'year'  => 'year',
-        'years' => 'years',
-        'month'  => 'month',
-        'months' => 'months',
-        'week'  => 'week',
-        'weeks' => 'weeks',
-        'day'  => 'day',
-        'days' => 'days',
-        'hour'  => 'hour',
-        'hours' => 'hours',
-        'minute'  => 'minute',
-        'minutes' => 'minutes',
-        'second'  => 'second',
-        'seconds' => 'seconds',
-        'nanosecond'  => 'nanosecond',
-        'nanoseconds' => 'nanoseconds',        
+        map { ($_) x 2 } qw/
+            and         year        years       month       months      
+            week        weeks       day         days        hour        
+            hours       minute      minutes     second      seconds     
+            nanosecond  nanoseconds 
+        /
     };
 
     my $locale = DateTime::Format::Human::Duration::Locale::calc_locale($span, $args{'locale'});
@@ -111,22 +87,19 @@ sub format_duration {
 
     my @parts;
     for my $unit (@units) {
-        my $val = $positive_duration_vals{$unit};
-        next unless $val;
+        my $val = $positive_duration_vals{$unit} or next;
 
         my $setup_key = $unit;
-        if ($val == 1) {
-            $setup_key =~ s/s$//;
-        }
+        $setup_key =~ s/s$// if $val == 1;
 
         push(@parts, $val . ' ' . $setup->{$setup_key});
-        if (exists $args{'significant_units'}) {
-            last if scalar(@parts) == $args{'significant_units'};
-        }
+
+        last if  exists $args{'significant_units'}
+             and @parts == $args{'significant_units'};
     }
     
     my $no_time = exists $args{'no_time'} ? $args{'no_time'} : $setup->{'no_time'};
-    return $no_time if !@parts;
+    return $no_time unless @parts;
 
     my $last = @parts > 1 ? pop(@parts): '';
 
@@ -137,9 +110,8 @@ sub format_duration {
         : join(', ', @parts) . (@parts > 1  ? ',' : '') . ($last ? " $setup->{'and'} $last" : '')
         ;
 
-    if ( $say ) {
-       $string = $say =~ m{%s} ? sprintf($say, $string): "$say $string";    
-    }
+    $string = $say =~ m{%s} ? sprintf($say, $string): "$say $string"
+        if $say;    
 
     return $string;
 }
